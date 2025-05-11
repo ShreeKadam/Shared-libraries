@@ -1,1 +1,31 @@
-
+@Library('shared-libraries')_
+pipeline {
+        agent any
+        stages {
+            stage('Clone Repository') {
+                steps {
+                    echo "Cloning ${repoUrl} (branch: ${branch})"
+                    git branch: branch, url: repoUrl
+                }
+            }
+            stage('Build with Maven') {
+                steps {
+                    echo "Running Maven Command: mvn ${mvnCommand}"
+                    sh "mvn ${mvnCommand}"
+                }
+            }
+        }
+        post {
+            success {
+                script {
+                    sendNotification(notifier, repoUrl, branch, mvnCommand, 'SUCCESS')
+                }
+            }
+            failure {
+                script {
+                    sendNotification(notifier, repoUrl, branch, mvnCommand, 'FAILURE')
+                }
+            }
+        }
+    }
+}
