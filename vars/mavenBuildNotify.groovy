@@ -1,58 +1,66 @@
-// vars/mavenBuildNotify.groovy
 def call(Map config = [:]) {
-    // Input parameters with defaults
-    def repoUrl = config.repoUrl ?: error("Missing repoUrl")
-    def branch = config.branch ?: 'main'
-    def mvnCommand = config.mvnCommand ?: 'clean package'
-    def notifier = config.notifier ?: 'console' // 'slack', 'telegram', 'console'
+    def repoUrl  = config.get('repoUrl', '')
+    def branch   = config.get('branch', 'main')
+    def mavenCmd = config.get('mavenCmd', 'clean install')
+    def slackChannel = config.get('slackChannel', '#all-arizona') // default channel
+    
 
-    // Pipeline steps
     pipeline {
         agent any
+
+        environment {
+            REPO_URL = repoUrl
+            BRANCH   = branch
+            MVN_CMD  = mavenCmd
+        }
+
+        options {
+            timestamps()
+        }
+
         stages {
             stage('Clone Repository') {
                 steps {
-                    echo "Cloning ${repoUrl} (branch: ${branch})"
-                    git branch: branch, url: repoUrl
+                    git branch: BRANCH, url: REPO_URL
                 }
             }
-            stage('Build with Maven') {
+
+            stage("Run Maven Command") {
                 steps {
-                    echo "Running Maven Command: mvn ${mvnCommand}"
-                    sh "mvn ${mvnCommand}"
+                    sh "mvn ${MVN_CMD}"
                 }
             }
         }
+
         post {
             success {
-                script {
-                    sendNotification(notifier, repoUrl, branch, mvnCommand, 'SUCCESS')
-                }
+                slackNotify('SUCCESS', slackChannel, slackColor)
             }
             failure {
-                script {
-                    sendNotification(notifier, repoUrl, branch, mvnCommand, 'FAILURE')
-                }
+                slackNotify('FAILURE', slackChannel, '#FF0000')
+            }
+            unstable {
+                slackNotify('UNSTABLE', slackChannel, '#FFFF00')
             }
         }
     }
 }
 
-// Internal function
-def sendNotification(String type, String repo, String branch, String command, String status) {
-    def msg = """
-    *Maven Build Notification*
-    • *Repository:* ${repo}
-    • *Branch:* ${branch}
-    • *Command:* mvn ${command}
-    • *Status:* ${status}
-    """.stripIndent().trim()
+def slackNotify(String status, String channel, String color) {
+    slackSend(
+        channel: channel,
+        color: color,
+        message: """
+*Build ${status}*
+• *Repo:* ${env.REPO_URL}
+• *Branch:* ${env.BRANCH}
+• *Maven Cmd:* mvn ${env.MVN_CMD}
+• *Job:* ${env.JOB_NAME}
+• *Build URL:* ${env.BUILD_URL}
+"""
+    )
+}
 
-    if (type == 'slack') {
-        slackSend(channel: '#builds', message: msg, color: status == 'SUCCESS' ? 'good' : 'danger')
-    } else if (type == 'telegram') {
-        // Simulated - requires external plugin or script
-        echo "[Telegram] ${msg}"
     } else {
         echo "[Console Notification] ${msg}"
     }
