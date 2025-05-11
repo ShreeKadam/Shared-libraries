@@ -34,13 +34,13 @@ def call(Map config = [:]) {
 
         post {
             success {
-                slackNotify('SUCCESS', slackChannel, slackColor)
+                slackNotify('SUCCESS', slackChannel)
             }
             failure {
-                slackNotify('FAILURE', slackChannel, '#FF0000')
+                slackNotify('FAILURE', slackChannel)
             }
             unstable {
-                slackNotify('UNSTABLE', slackChannel, '#FFFF00')
+                slackNotify('UNSTABLE', slackChannel)
             }
         }
     }
